@@ -9,15 +9,11 @@ use std::{
 	io::{ErrorKind::WouldBlock, Read, Write},
 	net::{Ipv4Addr, SocketAddrV4, TcpListener, TcpStream},
 	os::fd::AsRawFd,
-	sync::{
-		atomic::{AtomicU64, Ordering::SeqCst},
-		Arc,
-	},
 	thread,
 	time::Duration,
 };
 const PORT: u16 = 4242;
-const CLIENTS: usize = 1000;
+const CLIENTS: usize = 100;
 const RING_SZ: usize = 1024 * 32;
 const DURATION_SECS: u64 = 10;
 const MSG_SZ: usize = 8;
@@ -39,7 +35,7 @@ fn client_loop(mut stream: TcpStream, runtime: Duration) -> Vec<u64> {
 		let dur = recv - send;
 		latencies.push(dur);
 		let now = Instant::now();
-		while now.elapsed().as_micros() < 500 {
+		while now.elapsed().as_micros() < 10000 {
 			thread::yield_now()
 		}
 	}
@@ -69,6 +65,10 @@ fn client() {
 	let median = sent[(sent.len() as f64 * 0.5).floor() as usize];
 	let min = sent[0];
 	let max = sent[sent.len() - 1];
+	println!("==============");
+	println!("Client Results");
+	println!("==============");
+
 	println!("Sent stats .. min: {min} p50: {median} max: {max}");
 
 	for q in &[0.5f64, 0.9, 0.99, 0.999] {
@@ -395,17 +395,6 @@ fn main() {
 	let core_id = CoreId { id: 1usize };
 	let args = Args::parse();
 
-	let sum = Arc::new(AtomicU64::new(0));
-	//for _ in 0..1 {
-	//	let sum = sum.clone();
-	//	thread::spawn(move || {
-	//		core_affinity::set_for_current(core_id);
-	//		loop {
-	//			sum.fetch_add(1, SeqCst);
-	//		}
-	//	});
-	//}
-
 	match args.cmd {
 		Commands::Client => client(),
 		Commands::SimpleServer => {
@@ -425,6 +414,4 @@ fn main() {
 			round_robin_server()
 		}
 	}
-
-	println!("Sum: {}", sum.load(SeqCst));
 }

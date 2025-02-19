@@ -1,28 +1,36 @@
 #! /usr/bin/env bash
 
-cargo build --release
+OUTPUT=.tmp_output
 
-echo "" > iouring-server
-echo "" > iouring-server-perf
-echo "" > rr-server
-echo "" > rr-server-perf
+# Run server
+./target/release/app $1 &
+SERVER_PID=$!
 
-for i in $(seq 0 0);
-do
-	./target/release/lecture-ebpf epoll-server &
-	PID=$!
-	sleep 1s
-	taskset -c 10-70 ./target/release/lecture-ebpf client >> iouring-server &
-	perf stat -p $PID &>> iouring-server-perf
-	wait $PID
+echo "" > $OUTPUT
 
-	sleep 5s
+# Run client
+sleep 1s
+taskset -c 10-70 ./target/release/app client &>> $OUTPUT &
+CLIENT_PID=$!
 
-	./target/release/lecture-ebpf rr-server &
-	PID=$!
-	sleep 1s
-	taskset -c 10-70 ./target/release/lecture-ebpf client >> rr-server &
-	perf stat -p $PID &>> rr-server-perf
-	wait $PID
-done
+# Run perf stat
+sleep 1s
+echo "Running perf stat on server pid $SERVER_PID" &>> $OUTPUT
+perf stat -p $SERVER_PID &>> $OUTPUT &
+PERF_PID=$!
 
+# Run syscount
+sudo ~/Downloads/bcc/libbpf-tools/syscount -p $SERVER_PID &>> $OUTPUT &
+SYSCOUNT_PID=$!
+
+sleep 5s
+sudo kill -2 $PERF_PID
+sleep 1s
+sudo kill -2 $SYSCOUNT_PID
+
+# And wait for everything to end
+wait $SERVER_PID
+wait $CLIENT_PID
+
+cat .tmp_output
+rm .tmp_output
