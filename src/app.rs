@@ -13,7 +13,7 @@ use std::{
 	time::Duration,
 };
 const PORT: u16 = 4242;
-const CLIENTS: usize = 100;
+const CLIENTS: usize = 500;
 const RING_SZ: usize = 1024 * 32;
 const DURATION_SECS: u64 = 10;
 const MSG_SZ: usize = 8;
@@ -35,7 +35,7 @@ fn client_loop(mut stream: TcpStream, runtime: Duration) -> Vec<u64> {
 		let dur = recv - send;
 		latencies.push(dur);
 		let now = Instant::now();
-		while now.elapsed().as_micros() < 10000 {
+		while now.elapsed().as_micros() < 1000 {
 			thread::yield_now()
 		}
 	}
